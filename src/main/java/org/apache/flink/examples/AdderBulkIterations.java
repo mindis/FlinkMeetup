@@ -34,12 +34,10 @@ import org.apache.flink.types.LongValue;
 
 @SuppressWarnings("serial")
 public class AdderBulkIterations implements java.io.Serializable {
-
     /*Each input number must be between 0 - INPUT_MAX (exclusive)*/
     public static int INPUT_MAX = 100;
     /*Number of elements in our toy dataset*/
-    public static int NO_OF_ELEMENTS = 5;
-    
+    public static int NO_OF_ELEMENTS = 5;    
     /*Iterations stop when sum of all numbers exceeds ABSOLUTE_MAX*/
     public static long ABSOLUTE_MAX =NO_OF_ELEMENTS * 20000;
 
