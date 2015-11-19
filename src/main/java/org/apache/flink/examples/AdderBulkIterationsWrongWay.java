@@ -24,6 +24,8 @@ import java.util.Random;
 
 import org.apache.flink.api.common.aggregators.ConvergenceCriterion;
 import org.apache.flink.api.common.aggregators.LongSumAggregator;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -33,47 +35,48 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.types.LongValue;
 
 @SuppressWarnings("serial")
-public class AdderBulkIterations implements java.io.Serializable {
+public class AdderBulkIterationsWrongWay implements java.io.Serializable {
     /*Each input number must be between 0 - INPUT_MAX (exclusive)*/
     public static int INPUT_MAX = 100;
+    
     /*Number of elements in our toy dataset*/
-    public static int NO_OF_ELEMENTS = 10;    
+    public static int NO_OF_ELEMENTS = 10;
+    
     /*Iterations stop when sum of all numbers exceeds ABSOLUTE_MAX*/
-    public static long ABSOLUTE_MAX =NO_OF_ELEMENTS * 20000;
+    public static long ABSOLUTE_MAX = INPUT_MAX * NO_OF_ELEMENTS;
 
     /*Maxium Iterations*/
     public static int MAX_ITERATIONS = 100000;
     
     public static void main(String[] args) throws Exception {
         final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+        DataSet<Tuple2<Long, Long>> input = getData(env);
         long initialTime = System.currentTimeMillis();
-        // First create an initial dataset
-        IterativeDataSet<Tuple2<Long, Long>> initial = getData(
-                env).iterate(MAX_ITERATIONS);
-        //Register Aggregator and Convergence Criterion Class
-        initial.registerAggregationConvergenceCriterion("total", new LongSumAggregator(), new VerifyIfMaxConvergence());
         
-        DataSet<Tuple2<Long, Long>> iteration = initial
-                .map(new RichMapFunction<Tuple2<Long, Long>, Tuple2<Long, Long>>() {
-                    private LongSumAggregator agg = null;                    
-                    @Override
-                    public void open(Configuration parameters) {
-                        this.agg = this.getIterationRuntimeContext().getIterationAggregator("total");
-                    }
-                    @Override
-                    public Tuple2<Long, Long> map(
-                            Tuple2<Long, Long> input) throws Exception {
-                        long incrementF1 = input.f1 + 1;                            
-                        Tuple2<Long, Long> out = new Tuple2<>(input.f0, incrementF1);
-                        this.agg.aggregate(out.f1);
-                        return out;
-                    }
-                });
+        DataSet<Tuple2<Long, Long>> output = input;
         
-        DataSet<Tuple2<Long, Long>> finalDs = initial.closeWith(iteration);        
-        finalDs.print();
+        for(int i=0;i<MAX_ITERATIONS;i++){
+            output = input.map(new MapFunction<Tuple2<Long, Long>, Tuple2<Long, Long>>() {
+                        @Override
+                        public Tuple2<Long, Long> map(
+                                Tuple2<Long, Long> input) throws Exception {
+                            long incrementF1 = input.f1 + 1;                            
+                            Tuple2<Long, Long> out = new Tuple2<>(input.f0, incrementF1);
+                            return out;
+                        }
+                    });
+            
+            long sum = output.map(new FixTuple2()).reduce(new ReduceFunc()).collect().get(0);
+            input = output;
+            System.out.println("Current Sum="+sum);            
+            if(sum>ABSOLUTE_MAX){
+                System.out.println("Breaking now:"+i);
+                break;
+            }
+
+        }        
+        output.print();
         System.out.println("Total time to run the job " + (System.currentTimeMillis()-initialTime));
-        
     }
 
     public static DataSet<Tuple2<Long, Long>> getData(
@@ -90,7 +93,22 @@ public class AdderBulkIterations implements java.io.Serializable {
     public static class VerifyIfMaxConvergence implements ConvergenceCriterion<LongValue>{
         @Override
         public boolean isConverged(int iteration, LongValue value) {
-            return (value.getValue()>AdderBulkIterations.ABSOLUTE_MAX);
+            return (value.getValue()>AdderBulkIterationsWrongWay.ABSOLUTE_MAX);
         }
+    }
+    
+    public static class FixTuple2 implements MapFunction<Tuple2<Long,Long>,Long>{
+        @Override
+        public Long map(Tuple2<Long, Long> value) throws Exception {
+            return value.f1;
+        }        
+    }
+    
+    public static class ReduceFunc implements ReduceFunction<Long>{
+        @Override
+        public Long reduce(Long value1, Long value2) throws Exception {
+            return value1+value2;
+        }
+        
     }
 }

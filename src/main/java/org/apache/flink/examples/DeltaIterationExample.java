@@ -44,15 +44,14 @@ public class DeltaIterationExample {
         // set up execution environment
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
         // read vertex and edge data
-        DataSet<Long> vertices = GraphData.getDefaultVertexDataSet(env);
+        // initially assign parent vertex id== my vertex id
+        DataSet<Tuple2<Long, Long>> vertices = GraphData.getDefaultVertexDataSet(env);
         DataSet<Tuple2<Long, Long>> edges = GraphData.getDefaultEdgeDataSet(env);
 
-        // initially assign parent vertex id== my vertex id
-        DataSet<Tuple2<Long, Long>> verticesWithInitialId = vertices.map(new DuplicateValue<Long>());
-
+        int vertexIdIndex = 0;
         // open a delta iteration
-        DeltaIteration<Tuple2<Long, Long>, Tuple2<Long, Long>> iteration = verticesWithInitialId.iterateDelta(
-                verticesWithInitialId, MAX_ITERATIONS, 0);
+        DeltaIteration<Tuple2<Long, Long>, Tuple2<Long, Long>> iteration =                
+                           vertices.iterateDelta(vertices , MAX_ITERATIONS, vertexIdIndex );                                                 
 
         // apply the step logic: join with the edges, select the minimum
         // neighbor, update if the component of the candidate is smaller
@@ -67,20 +66,6 @@ public class DeltaIterationExample {
         DataSet<Tuple2<Long, Long>> result = iteration.closeWith(changes, changes);
         result.print();
     }
-
-    /**
-     * Function that turns a value into a 2-tuple where both fields are that
-     * value.
-     */
-    @ForwardedFields("*->f0")
-    public static final class DuplicateValue<T> implements MapFunction<T, Tuple2<T, T>> {
-
-        @Override
-        public Tuple2<T, T> map(T vertex) {
-            return new Tuple2<T, T>(vertex, vertex);
-        }
-    }
-
   
     /**
      * UDF that joins a (Vertex-ID, Component-ID) pair that represents the

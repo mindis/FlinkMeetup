@@ -4,6 +4,8 @@ package org.apache.flink.examples;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.java.functions.FunctionAnnotation.ForwardedFields;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -18,10 +20,10 @@ public class GraphData {
     public static final long[] VERTICES  = new long[] {
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
-    public static DataSet<Long> getDefaultVertexDataSet(ExecutionEnvironment env) {
-        List<Long> verticesList = new LinkedList<Long>();
+    public static DataSet<Tuple2<Long,Long>> getDefaultVertexDataSet(ExecutionEnvironment env) {
+        List<Tuple2<Long,Long>> verticesList = new LinkedList<Tuple2<Long,Long>>();
         for (long vertexId : VERTICES) {
-            verticesList.add(vertexId);
+            verticesList.add(new Tuple2<Long, Long>(vertexId, vertexId));
         }
         return env.fromCollection(verticesList);
     }
@@ -50,5 +52,16 @@ public class GraphData {
         }
         return env.fromCollection(edgeList);
     }
-    
+    /**
+     * Function that turns a value into a 2-tuple where both fields are that
+     * value.
+     */
+    @ForwardedFields("*->f0")
+    public static final class DuplicateValue<T> implements MapFunction<T, Tuple2<T, T>> {
+
+        @Override
+        public Tuple2<T, T> map(T vertex) {
+            return new Tuple2<T, T>(vertex, vertex);
+        }
+    }
 }
