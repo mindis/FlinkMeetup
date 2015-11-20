@@ -62,6 +62,7 @@ public class DeltaIterationExample {
         .join(iteration.getSolutionSet()).where(0).equalTo(0)
         /* Only pass on the changes to next iteration */
         .with(new ComponentIdFilter());
+        
         // close the delta iteration (delta and new workset are identical)
         DataSet<Tuple2<Long, Long>> result = iteration.closeWith(changes, changes);
         result.print();
